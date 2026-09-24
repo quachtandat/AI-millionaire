@@ -3,6 +3,8 @@ const cors = require("cors");
 
 const pool = require("./config/db");
 const authRoutes = require("./routes/auth.routes");
+const categoryRoutes = require("./routes/category.routes");
+const questionRoutes = require("./routes/question.routes");
 
 const app = express();
 
@@ -13,6 +15,9 @@ app.use(express.json());
 // Authentication routes
 app.use("/api/auth", authRoutes);
 
+app.use("/api/categories",categoryRoutes);
+
+app.use( "/api/questions", questionRoutes);
 // Home
 app.get("/", (req, res) => {
     res.json({
