@@ -6,6 +6,8 @@ const authRoutes = require("./routes/auth.routes");
 const categoryRoutes = require("./routes/category.routes");
 const questionRoutes = require("./routes/question.routes");
 
+const gameRoutes = require("./routes/game.routes");
+
 const app = express();
 
 // Middleware
@@ -18,6 +20,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/categories",categoryRoutes);
 
 app.use( "/api/questions", questionRoutes);
+
+app.use("/api/games", gameRoutes);
 // Home
 app.get("/", (req, res) => {
     res.json({
