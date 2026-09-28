@@ -122,6 +122,31 @@ async function answerQuestion(req, res) {
     }
 }
 
+
+// stop game
+async function stopCurrentGame(req, res) {
+  try {
+    const gameId = req.params.id;
+    const userId = req.user.userId;
+
+    const result = await gameService.stopGame(gameId, userId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Dừng game thành công",
+      data: result
+    });
+  } catch (error) {
+    console.error("STOP GAME ERROR:", error);
+
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Không thể dừng game"
+    });
+  }
+}
+
+
 module.exports = {
-    startGame, getCurrentGame,answerQuestion
+    startGame, getCurrentGame,answerQuestion,stopCurrentGame
 };

@@ -433,9 +433,75 @@ async function answerCurrentQuestion(gameId, userId, selectedAnswer) {
     }
 }
 
+// stop game
+async function stopGame(gameId, userId) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    // 1. Tìm game của user hiện tại
+    const [games] = await connection.query(
+      `
+      SELECT
+        id,
+        user_id,
+        current_level,
+        current_prize,
+        status
+      FROM games
+      WHERE id = ?
+        AND user_id = ?
+      FOR UPDATE
+      `,
+      [gameId, userId]
+    );
+
+    if (games.length === 0) {
+      throw new Error("Game không tồn tại");
+    }
+
+    const game = games[0];
+
+    // 2. Chỉ game đang chơi mới được dừng
+    if (game.status !== "playing") {
+      throw new Error(
+        `Không thể dừng game vì game hiện đang ở trạng thái: ${game.status}`
+      );
+    }
+
+    // 3. Cập nhật game thành stopped
+    await connection.query(
+      `
+      UPDATE games
+      SET
+        status = 'stopped',
+        finished_at = NOW()
+      WHERE id = ?
+      `,
+      [gameId]
+    );
+
+    await connection.commit();
+
+    // 4. Trả kết quả về
+    return {
+      gameId: game.id,
+      status: "stopped",
+      currentLevel: game.current_level,
+      currentPrize: game.current_prize
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+
 module.exports = {
     startGame,
     getGameById,
     getCurrentQuestion,
-    answerCurrentQuestion
+    answerCurrentQuestion,
+    stopGame
 };
