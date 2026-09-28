@@ -2,12 +2,14 @@ const express = require("express");
 
 const router = express.Router();
 
-const { startGame, getCurrentGame, answerQuestion, stopCurrentGame } = require("../controllers/game.controller");
+const { startGame, getCurrentGame, answerQuestion, stopCurrentGame, getGameHistory } = require("../controllers/game.controller");
 
 const { authenticateToken } = require("../middleware/auth.middleware");
 
 // Bắt đầu game
 router.post("/start",authenticateToken,startGame);
+// lấy history game
+router.get("/history", authenticateToken, getGameHistory);
 // Lấy game hiện tại
 router.get("/:id", authenticateToken, getCurrentGame);
 // Trả lời câu hỏi hiện tại

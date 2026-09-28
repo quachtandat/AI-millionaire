@@ -498,10 +498,40 @@ async function stopGame(gameId, userId) {
 }
 
 
+// history game
+async function getGameHistory(userId) {
+  const [games] = await pool.query(
+    `
+    SELECT
+      id,
+      current_level,
+      current_prize,
+      status,
+      started_at,
+      finished_at
+    FROM games
+    WHERE user_id = ?
+    ORDER BY started_at DESC
+    `,
+    [userId]
+  );
+
+  return games.map((game) => ({
+    gameId: game.id,
+    currentLevel: game.current_level,
+    currentPrize: game.current_prize,
+    status: game.status,
+    startedAt: game.started_at,
+    finishedAt: game.finished_at
+  }));
+}
+
+
 module.exports = {
     startGame,
     getGameById,
     getCurrentQuestion,
     answerCurrentQuestion,
-    stopGame
+    stopGame,
+    getGameHistory
 };

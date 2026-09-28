@@ -147,6 +147,29 @@ async function stopCurrentGame(req, res) {
 }
 
 
+// get history game
+async function getGameHistory(req, res) {
+  try {
+    // Lấy userId từ JWT
+    const userId = req.user.userId;
+
+    // Gọi service để lấy lịch sử game
+    const games = await gameService.getGameHistory(userId);
+
+    return res.status(200).json({
+      success: true,
+      data: games
+    });
+  } catch (error) {
+    console.error("GET GAME HISTORY ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Không thể lấy lịch sử game"
+    });
+  }
+}
+
 module.exports = {
-    startGame, getCurrentGame,answerQuestion,stopCurrentGame
+    startGame, getCurrentGame,answerQuestion,stopCurrentGame,getGameHistory
 };
