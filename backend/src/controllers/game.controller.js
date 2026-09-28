@@ -70,6 +70,58 @@ async function getCurrentGame(req, res) {
     }
 }
 
+// POST /api/games/:id/answer
+// Trả lời câu hỏi hiện tại
+async function answerQuestion(req, res) {
+    try {
+
+        const gameId = req.params.id;
+
+        const userId = req.user.userId;
+
+        const { selectedAnswer } = req.body;
+
+
+        if (!selectedAnswer) {
+            return res.status(400).json({
+                success: false,
+                message: "Vui lòng chọn đáp án"
+            });
+        }
+
+
+        const result =
+            await gameService.answerCurrentQuestion(
+                gameId,
+                userId,
+                selectedAnswer
+            );
+
+
+        return res.status(200).json({
+            success: true,
+            message: result.isCorrect
+                ? "Trả lời đúng"
+                : "Trả lời sai",
+
+            data: result
+        });
+
+    } catch (error) {
+
+        console.error(
+            "ANSWER QUESTION ERROR:",
+            error
+        );
+
+
+        return res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+}
+
 module.exports = {
-    startGame, getCurrentGame
+    startGame, getCurrentGame,answerQuestion
 };

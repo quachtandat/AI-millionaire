@@ -185,8 +185,257 @@ async function getCurrentQuestion(gameId, userId) {
     return rows[0];
 }
 
+// Trả lời câu hỏi hiện tại
+async function answerCurrentQuestion(gameId, userId, selectedAnswer) {
+    const connection = await pool.getConnection();
+
+    try {
+        await connection.beginTransaction();
+
+        // 1. Kiểm tra đáp án hợp lệ
+        const validAnswers = ["A", "B", "C", "D"];
+
+        if (!validAnswers.includes(selectedAnswer)) {
+            throw new Error(
+                "Đáp án không hợp lệ. Chỉ được chọn A, B, C hoặc D."
+            );
+        }
+
+        // 2. Lấy game hiện tại
+        const [games] = await connection.query(
+            `
+            SELECT
+                id,
+                user_id,
+                current_level,
+                current_prize,
+                status
+            FROM games
+            WHERE id = ?
+              AND user_id = ?
+            LIMIT 1
+            `,
+            [gameId, userId]
+        );
+
+
+        if (games.length === 0) {
+            throw new Error("Game không tồn tại");
+        }
+
+
+        const game = games[0];
+
+        // 3. Kiểm tra game còn đang chơi không
+        if (game.status !== "playing") {
+            throw new Error("Game đã kết thúc");
+        }
+
+        // 4. Lấy câu hỏi hiện tại
+        const [questions] = await connection.query(
+            `
+            SELECT
+                q.id,
+                q.question,
+                q.option_a,
+                q.option_b,
+                q.option_c,
+                q.option_d,
+                q.correct_answer,
+                q.explanation,
+                q.prize_level
+            FROM game_questions gq
+
+            INNER JOIN questions q
+                ON gq.question_id = q.id
+
+            WHERE gq.game_id = ?
+              AND gq.level = ?
+            LIMIT 1
+            `,
+            [
+                gameId,
+                game.current_level
+            ]
+        );
+
+
+        if (questions.length === 0) {
+            throw new Error(
+                "Không tìm thấy câu hỏi hiện tại"
+            );
+        }
+
+        const question = questions[0];
+
+        // 5. Kiểm tra đáp án
+        const isCorrect =
+            selectedAnswer === question.correct_answer;
+
+        // 6. Lưu câu trả lời
+        await connection.query(
+            `
+            INSERT INTO game_answers
+            (
+                game_id,
+                question_id,
+                selected_answer,
+                is_correct
+            )
+            VALUES (?, ?, ?, ?)
+            `,
+            [
+                gameId,
+                question.id,
+                selectedAnswer,
+                isCorrect
+            ]
+        );
+
+        // 7. Nếu trả lời SAI
+        if (!isCorrect) {
+            await connection.query(
+                `
+                UPDATE games
+                SET
+                    status = 'lost',
+                    finished_at = NOW()
+                WHERE id = ?
+                `,
+                [gameId]
+            );
+
+            await connection.commit();
+
+            return {
+                gameOver: true,
+                isCorrect: false,
+                gameStatus: "lost",
+                currentLevel: game.current_level,
+                currentPrize: game.current_prize,
+                correctAnswer: question.correct_answer,
+                explanation: question.explanation
+            };
+        }
+
+        // 8. Nếu trả lời ĐÚNG
+        const currentLevel = game.current_level;
+
+        // 9. Nếu thắng level 15
+        if (currentLevel === 15) {
+            const finalPrize = PRIZE_LEVELS[15];
+
+            await connection.query(
+                `
+                UPDATE games
+                SET
+                    current_prize = ?,
+                    status = 'won',
+                    finished_at = NOW()
+                WHERE id = ?
+                `,
+                [
+                    finalPrize,
+                    gameId
+                ]
+            );
+
+            await connection.commit();
+
+            return {
+                gameOver: true,
+                isCorrect: true,
+                gameStatus: "won",
+                currentLevel: 15,
+                currentPrize: finalPrize,
+                message: "Chúc mừng! Bạn đã thắng 1 tỷ đồng!"
+            };
+        }
+
+        // 10. Sang level tiếp theo
+        const nextLevel = currentLevel + 1;
+        const nextPrize = PRIZE_LEVELS[nextLevel];
+
+        await connection.query(
+            `
+            UPDATE games
+            SET
+                current_level = ?,
+                current_prize = ?
+            WHERE id = ?
+            `,
+            [
+                nextLevel,
+                nextPrize,
+                gameId
+            ]
+        );
+
+        // 11. Lấy câu hỏi tiếp theo
+        const [nextQuestions] = await connection.query(
+            `
+            SELECT
+                q.id AS question_id,
+                q.question,
+                q.option_a,
+                q.option_b,
+                q.option_c,
+                q.option_d,
+                q.category_id,
+                c.name AS category_name,
+                q.difficulty,
+                q.prize_level
+
+            FROM game_questions gq
+
+            INNER JOIN questions q
+                ON gq.question_id = q.id
+
+            LEFT JOIN categories c
+                ON q.category_id = c.id
+
+            WHERE gq.game_id = ?
+              AND gq.level = ?
+            LIMIT 1
+            `,
+            [
+                gameId,
+                nextLevel
+            ]
+        );
+
+        if (nextQuestions.length === 0) {
+            throw new Error(
+                "Không tìm thấy câu hỏi tiếp theo"
+            );
+        }
+
+        const nextQuestion = nextQuestions[0];
+
+        // 12. Commit
+        await connection.commit();
+
+        // 13. Trả kết quả
+        return {
+            gameOver: false,
+            isCorrect: true,
+            gameStatus: "playing",
+            currentLevel: nextLevel,
+            currentPrize: nextPrize,
+            question: nextQuestion
+        };
+
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
+}
+
 module.exports = {
     startGame,
     getGameById,
-    getCurrentQuestion
+    getCurrentQuestion,
+    answerCurrentQuestion
 };
