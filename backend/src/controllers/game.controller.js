@@ -272,6 +272,66 @@ async function useFiftyFifty(req, res) {
   }
 }
 
+
+// Audience
+async function useAudience(req, res) {
+  try {
+    const gameId = req.params.id;
+    const userId = req.user.userId;
+
+    const result = await gameService.useAudience(
+      gameId,
+      userId
+    );
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Sử dụng quyền trợ giúp Audience thành công",
+      data: result
+    });
+  } catch (error) {
+    console.error("USE AUDIENCE ERROR:", error);
+
+    return res.status(400).json({
+      success: false,
+      message:
+        error.message ||
+        "Không thể sử dụng quyền trợ giúp Audience"
+    });
+  }
+}
+
+
+// phone
+async function usePhone(req, res) {
+  try {
+    const gameId = req.params.id;
+    const userId = req.user.userId;
+
+    const result = await gameService.usePhone(
+      gameId,
+      userId
+    );
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Sử dụng quyền trợ giúp Phone thành công",
+      data: result
+    });
+  } catch (error) {
+    console.error("USE PHONE ERROR:", error);
+
+    return res.status(400).json({
+      success: false,
+      message:
+        error.message ||
+        "Không thể sử dụng quyền trợ giúp Phone"
+    });
+  }
+}
+
 module.exports = {
-    startGame, getCurrentGame,answerQuestion,stopCurrentGame,getGameHistory,getGameDetail,getGameRanking,getGameStatistics,useFiftyFifty
+    startGame, getCurrentGame,answerQuestion,stopCurrentGame,getGameHistory,getGameDetail,getGameRanking,getGameStatistics,useFiftyFifty,useAudience,usePhone
 };

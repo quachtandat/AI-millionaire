@@ -860,6 +860,311 @@ async function useFiftyFifty(gameId, userId) {
   }
 }
 
+
+// Audience
+function generateAudiencePercentages(correctAnswer) {
+  const answers = ["A", "B", "C", "D"];
+
+  const percentages = {
+    A: 0,
+    B: 0,
+    C: 0,
+    D: 0
+  };
+
+  // Đáp án đúng sẽ nhận từ 45% đến 70%
+  const correctPercentage =
+    Math.floor(Math.random() * 26) + 45;
+
+  percentages[correctAnswer] = correctPercentage;
+
+  // Lấy 3 đáp án sai
+  const wrongAnswers = answers.filter(
+    (answer) => answer !== correctAnswer
+  );
+
+  let remaining = 100 - correctPercentage;
+
+  // Chia phần trăm còn lại cho 3 đáp án sai
+  for (let i = 0; i < wrongAnswers.length; i++) {
+    if (i === wrongAnswers.length - 1) {
+      percentages[wrongAnswers[i]] = remaining;
+    } else {
+      const max =
+        remaining - (wrongAnswers.length - i - 1);
+
+      const value =
+        Math.floor(Math.random() * max) + 1;
+
+      percentages[wrongAnswers[i]] = value;
+
+      remaining -= value;
+    }
+  }
+
+  return percentages;
+}
+
+async function useAudience(gameId, userId) {
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    // 1. Kiểm tra game
+    const [games] = await connection.query(
+      `
+      SELECT
+        id,
+        user_id,
+        current_level,
+        status
+      FROM games
+      WHERE id = ?
+        AND user_id = ?
+      FOR UPDATE
+      `,
+      [gameId, userId]
+    );
+
+    if (games.length === 0) {
+      throw new Error("Game không tồn tại");
+    }
+
+    const game = games[0];
+
+    // 2. Game phải đang chơi
+    if (game.status !== "playing") {
+      throw new Error(
+        `Không thể sử dụng Audience vì game đang ở trạng thái: ${game.status}`
+      );
+    }
+
+    // 3. Kiểm tra Audience đã dùng chưa
+    const [usedLifelines] = await connection.query(
+      `
+      SELECT id
+      FROM game_lifelines
+      WHERE game_id = ?
+        AND lifeline_type = 'audience'
+      `,
+      [gameId]
+    );
+
+    if (usedLifelines.length > 0) {
+      throw new Error(
+        "Quyền trợ giúp Audience đã được sử dụng"
+      );
+    }
+
+    // 4. Lấy câu hỏi hiện tại
+    const [questions] = await connection.query(
+      `
+      SELECT
+        q.id,
+        q.correct_answer
+      FROM game_questions gq
+      INNER JOIN questions q
+        ON gq.question_id = q.id
+      WHERE gq.game_id = ?
+        AND gq.level = ?
+      `,
+      [gameId, game.current_level]
+    );
+
+    if (questions.length === 0) {
+      throw new Error("Không tìm thấy câu hỏi hiện tại");
+    }
+
+    const question = questions[0];
+
+    // 5. Lấy đáp án đúng ở backend
+    const correctAnswer = question.correct_answer;
+
+    // 6. Tạo tỷ lệ khán giả
+    const percentages =
+      generateAudiencePercentages(correctAnswer);
+
+    // 7. Lưu quyền trợ giúp
+    await connection.query(
+      `
+      INSERT INTO game_lifelines (
+        game_id,
+        lifeline_type
+      )
+      VALUES (?, 'audience')
+      `,
+      [gameId]
+    );
+
+    // 8. Commit
+    await connection.commit();
+
+    // 9. Không trả correctAnswer
+    return {
+      lifeline: "audience",
+      percentages
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+
+// phone
+function generatePhoneAdvice(correctAnswer) {
+  const answers = ["A", "B", "C", "D"];
+
+  // Phone có khoảng 75% khả năng đoán đúng
+  const isCorrect = Math.random() < 0.75;
+
+  let suggestedAnswer;
+
+  if (isCorrect) {
+    suggestedAnswer = correctAnswer;
+  } else {
+    // Lấy các đáp án sai
+    const wrongAnswers = answers.filter(
+      (answer) => answer !== correctAnswer
+    );
+
+    // Chọn ngẫu nhiên một đáp án sai
+    const randomIndex = Math.floor(
+      Math.random() * wrongAnswers.length
+    );
+
+    suggestedAnswer = wrongAnswers[randomIndex];
+  }
+
+  // Confidence từ 60% đến 90%
+  const confidence =
+    Math.floor(Math.random() * 31) + 60;
+
+  return {
+    suggestedAnswer,
+    confidence
+  };
+}
+
+async function usePhone(gameId, userId) {
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    // 1. Kiểm tra game
+    const [games] = await connection.query(
+      `
+      SELECT
+        id,
+        user_id,
+        current_level,
+        status
+      FROM games
+      WHERE id = ?
+        AND user_id = ?
+      FOR UPDATE
+      `,
+      [gameId, userId]
+    );
+
+    if (games.length === 0) {
+      throw new Error("Game không tồn tại");
+    }
+
+    const game = games[0];
+
+    // 2. Game phải đang chơi
+    if (game.status !== "playing") {
+      throw new Error(
+        `Không thể sử dụng Phone vì game đang ở trạng thái: ${game.status}`
+      );
+    }
+
+    // 3. Kiểm tra Phone đã được sử dụng chưa
+    const [usedLifelines] = await connection.query(
+      `
+      SELECT id
+      FROM game_lifelines
+      WHERE game_id = ?
+        AND lifeline_type = 'phone'
+      `,
+      [gameId]
+    );
+
+    if (usedLifelines.length > 0) {
+      throw new Error(
+        "Quyền trợ giúp Phone đã được sử dụng"
+      );
+    }
+
+    // 4. Lấy câu hỏi hiện tại
+    const [questions] = await connection.query(
+      `
+      SELECT
+        q.id,
+        q.correct_answer
+      FROM game_questions gq
+      INNER JOIN questions q
+        ON gq.question_id = q.id
+      WHERE gq.game_id = ?
+        AND gq.level = ?
+      `,
+      [gameId, game.current_level]
+    );
+
+    if (questions.length === 0) {
+      throw new Error("Không tìm thấy câu hỏi hiện tại");
+    }
+
+    const question = questions[0];
+
+    // 5. Lấy đáp án đúng ở backend
+    const correctAnswer = question.correct_answer;
+
+    // 6. Tạo lời khuyên
+    const adviceResult =
+      generatePhoneAdvice(correctAnswer);
+
+    // 7. Tạo message
+    const advice =
+      `Tôi nghĩ đáp án ${adviceResult.suggestedAnswer} ` +
+      `có vẻ đúng. Tôi khá tự tin khoảng ` +
+      `${adviceResult.confidence}%.`;
+
+    // 8. Lưu việc sử dụng Phone
+    await connection.query(
+      `
+      INSERT INTO game_lifelines (
+        game_id,
+        lifeline_type
+      )
+      VALUES (?, 'phone')
+      `,
+      [gameId]
+    );
+
+    // 9. Commit
+    await connection.commit();
+
+    // 10. Trả kết quả
+    return {
+      lifeline: "phone",
+      advice,
+      suggestedAnswer: adviceResult.suggestedAnswer,
+      confidence: adviceResult.confidence
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 module.exports = {
     startGame,
     getGameById,
@@ -870,5 +1175,7 @@ module.exports = {
     getGameDetail,
     getGameRanking,
     getGameStatistics,
-    useFiftyFifty
+    useFiftyFifty,
+    useAudience,
+    usePhone
 };
