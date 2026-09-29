@@ -219,6 +219,30 @@ async function getGameRanking(req, res) {
   }
 }
 
+
+// Personal Statistics
+async function getGameStatistics(req, res) {
+  try {
+    const userId = req.user.userId;
+
+    const statistics = await gameService.getGameStatistics(
+      userId
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: statistics
+    });
+  } catch (error) {
+    console.error("GET GAME STATISTICS ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Không thể lấy thống kê game"
+    });
+  }
+}
+
 module.exports = {
-    startGame, getCurrentGame,answerQuestion,stopCurrentGame,getGameHistory,getGameDetail,getGameRanking
+    startGame, getCurrentGame,answerQuestion,stopCurrentGame,getGameHistory,getGameDetail,getGameRanking,getGameStatistics
 };

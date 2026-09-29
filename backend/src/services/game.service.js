@@ -638,6 +638,96 @@ async function getGameRanking(limit = 20) {
 }
 
 
+// Personal Statistics
+async function getGameStatistics(userId) {
+  // 1. Thống kê game
+  const [gameStats] = await pool.query(
+    `
+    SELECT
+      COUNT(*) AS games_played,
+
+      SUM(
+        CASE
+          WHEN status = 'won' THEN 1
+          ELSE 0
+        END
+      ) AS games_won,
+
+      SUM(
+        CASE
+          WHEN status = 'lost' THEN 1
+          ELSE 0
+        END
+      ) AS games_lost,
+
+      SUM(
+        CASE
+          WHEN status = 'stopped' THEN 1
+          ELSE 0
+        END
+      ) AS games_stopped,
+
+      COALESCE(MAX(current_prize), 0) AS highest_prize,
+
+      COALESCE(MAX(current_level), 0) AS highest_level
+
+    FROM games
+    WHERE user_id = ?
+    `,
+    [userId]
+  );
+
+  // 2. Thống kê câu trả lời
+  const [answerStats] = await pool.query(
+    `
+    SELECT
+      COUNT(*) AS total_questions_answered,
+
+      SUM(
+        CASE
+          WHEN is_correct = 1 THEN 1
+          ELSE 0
+        END
+      ) AS correct_answers,
+
+      SUM(
+        CASE
+          WHEN is_correct = 0 THEN 1
+          ELSE 0
+        END
+      ) AS wrong_answers
+
+    FROM game_answers
+    WHERE game_id IN (
+      SELECT id
+      FROM games
+      WHERE user_id = ?
+    )
+    `,
+    [userId]
+  );
+
+  const game = gameStats[0];
+  const answer = answerStats[0];
+
+  return {
+    gamesPlayed: Number(game.games_played),
+    gamesWon: Number(game.games_won),
+    gamesLost: Number(game.games_lost),
+    gamesStopped: Number(game.games_stopped),
+
+    highestPrize: Number(game.highest_prize),
+    highestLevel: Number(game.highest_level),
+
+    totalQuestionsAnswered: Number(
+      answer.total_questions_answered
+    ),
+
+    correctAnswers: Number(answer.correct_answers),
+    wrongAnswers: Number(answer.wrong_answers)
+  };
+}
+
 module.exports = {
     startGame,
     getGameById,
@@ -646,5 +736,6 @@ module.exports = {
     stopGame,
     getGameHistory,
     getGameDetail,
-    getGameRanking
+    getGameRanking,
+    getGameStatistics
 };
