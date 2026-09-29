@@ -2,7 +2,7 @@ const express = require("express");
 
 const router = express.Router();
 
-const { startGame, getCurrentGame, answerQuestion, stopCurrentGame, getGameHistory, getGameDetail, getGameRanking, getGameStatistics } = require("../controllers/game.controller");
+const { startGame, getCurrentGame, answerQuestion, stopCurrentGame, getGameHistory, getGameDetail, getGameRanking, getGameStatistics, useFiftyFifty } = require("../controllers/game.controller");
 
 const { authenticateToken } = require("../middleware/auth.middleware");
 
@@ -22,6 +22,8 @@ router.get("/:id", authenticateToken, getCurrentGame);
 router.post("/:id/answer",authenticateToken,answerQuestion);
 // stop game
 router.post("/:id/stop", authenticateToken, stopCurrentGame);
+// 50:50
+router.post("/:id/lifelines/fifty-fifty", authenticateToken, useFiftyFifty);
 
 
 module.exports = router;

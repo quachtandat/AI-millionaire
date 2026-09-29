@@ -728,6 +728,138 @@ async function getGameStatistics(userId) {
   };
 }
 
+
+//50:50
+async function useFiftyFifty(gameId, userId) {
+  const connection = await pool.getConnection();
+
+  try {
+    // Bắt đầu transaction
+    await connection.beginTransaction();
+
+    // 1. Kiểm tra game
+    const [games] = await connection.query(
+      `
+      SELECT
+        id,
+        user_id,
+        current_level,
+        status
+      FROM games
+      WHERE id = ?
+        AND user_id = ?
+      FOR UPDATE
+      `,
+      [gameId, userId]
+    );
+
+    if (games.length === 0) {
+      throw new Error("Game không tồn tại");
+    }
+
+    const game = games[0];
+
+    // 2. Game phải đang chơi
+    if (game.status !== "playing") {
+      throw new Error(
+        `Không thể sử dụng 50:50 vì game đang ở trạng thái: ${game.status}`
+      );
+    }
+
+    // 3. Kiểm tra 50:50 đã được sử dụng chưa
+    const [usedLifelines] = await connection.query(
+      `
+      SELECT id
+      FROM game_lifelines
+      WHERE game_id = ?
+        AND lifeline_type = 'fifty_fifty'
+      `,
+      [gameId]
+    );
+
+    if (usedLifelines.length > 0) {
+      throw new Error(
+        "Quyền trợ giúp 50:50 đã được sử dụng"
+      );
+    }
+
+    // 4. Lấy câu hỏi hiện tại
+    const [questions] = await connection.query(
+      `
+      SELECT
+        q.id,
+        q.option_a,
+        q.option_b,
+        q.option_c,
+        q.option_d,
+        q.correct_answer
+      FROM game_questions gq
+      INNER JOIN questions q
+        ON gq.question_id = q.id
+      WHERE gq.game_id = ?
+        AND gq.level = ?
+      `,
+      [gameId, game.current_level]
+    );
+
+    if (questions.length === 0) {
+      throw new Error("Không tìm thấy câu hỏi hiện tại");
+    }
+
+    const question = questions[0];
+
+    // 5. Danh sách 4 đáp án
+    const answers = ["A", "B", "C", "D"];
+
+    // 6. Lấy các đáp án sai
+    const wrongAnswers = answers.filter(
+      (answer) => answer !== question.correct_answer
+    );
+
+    // 7. Chọn ngẫu nhiên 1 đáp án sai để giữ lại
+    const randomIndex = Math.floor(
+      Math.random() * wrongAnswers.length
+    );
+
+    const keepWrongAnswer = wrongAnswers[randomIndex];
+
+    // 8. Hai đáp án sai còn lại sẽ bị loại
+    const removedOptions = wrongAnswers.filter(
+      (answer) => answer !== keepWrongAnswer
+    );
+
+    // 9. Lưu việc sử dụng 50:50
+    await connection.query(
+      `
+      INSERT INTO game_lifelines (
+        game_id,
+        lifeline_type
+      )
+      VALUES (?, 'fifty_fifty')
+      `,
+      [gameId]
+    );
+
+    // 10. Commit transaction
+    await connection.commit();
+
+    // 11. Chỉ trả về các đáp án bị loại
+    // Không trả correct_answer
+    return {
+      lifeline: "fifty_fifty",
+      removedOptions
+    };
+  } catch (error) {
+    // Nếu có lỗi thì rollback
+    await connection.rollback();
+
+    throw error;
+  } finally {
+    // Luôn giải phóng connection
+    connection.release();
+  }
+}
+
 module.exports = {
     startGame,
     getGameById,
@@ -737,5 +869,6 @@ module.exports = {
     getGameHistory,
     getGameDetail,
     getGameRanking,
-    getGameStatistics
+    getGameStatistics,
+    useFiftyFifty
 };

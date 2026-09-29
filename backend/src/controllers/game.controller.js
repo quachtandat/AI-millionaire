@@ -243,6 +243,35 @@ async function getGameStatistics(req, res) {
   }
 }
 
+
+// 50:50
+async function useFiftyFifty(req, res) {
+  try {
+    const gameId = req.params.id;
+    const userId = req.user.userId;
+
+    const result = await gameService.useFiftyFifty(
+      gameId,
+      userId
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Sử dụng quyền trợ giúp 50:50 thành công",
+      data: result
+    });
+  } catch (error) {
+    console.error("USE FIFTY-FIFTY ERROR:", error);
+
+    return res.status(400).json({
+      success: false,
+      message:
+        error.message ||
+        "Không thể sử dụng quyền trợ giúp 50:50"
+    });
+  }
+}
+
 module.exports = {
-    startGame, getCurrentGame,answerQuestion,stopCurrentGame,getGameHistory,getGameDetail,getGameRanking,getGameStatistics
+    startGame, getCurrentGame,answerQuestion,stopCurrentGame,getGameHistory,getGameDetail,getGameRanking,getGameStatistics,useFiftyFifty
 };
