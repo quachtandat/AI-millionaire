@@ -527,11 +527,80 @@ async function getGameHistory(userId) {
 }
 
 
+// Game detail
+async function getGameDetail(gameId, userId) {
+  // 1. Lấy thông tin game
+  const [games] = await pool.query(
+    `
+    SELECT
+      id,
+      current_level,
+      current_prize,
+      status,
+      started_at,
+      finished_at
+    FROM games
+    WHERE id = ?
+      AND user_id = ?
+    `,
+    [gameId, userId]
+  );
+
+  // 2. Kiểm tra game có tồn tại không
+  if (games.length === 0) {
+    throw new Error("Game không tồn tại");
+  }
+  const game = games[0];
+
+  // 3. Lấy các câu hỏi đã trả lời
+  const [answers] = await pool.query(
+    `
+    SELECT
+      ga.question_id,
+      gq.level,
+      q.question,
+      ga.selected_answer,
+      ga.is_correct,
+      ga.answered_at
+    FROM game_answers ga
+    INNER JOIN game_questions gq
+      ON ga.game_id = gq.game_id
+      AND ga.question_id = gq.question_id
+    INNER JOIN questions q
+      ON ga.question_id = q.id
+    WHERE ga.game_id = ?
+    ORDER BY gq.level ASC
+    `,
+    [gameId]
+  );
+
+  return {
+    game: {
+      gameId: game.id,
+      currentLevel: game.current_level,
+      currentPrize: game.current_prize,
+      status: game.status,
+      startedAt: game.started_at,
+      finishedAt: game.finished_at
+    },
+
+    answers: answers.map((answer) => ({
+      level: answer.level,
+      questionId: answer.question_id,
+      question: answer.question,
+      selectedAnswer: answer.selected_answer,
+      isCorrect: Boolean(answer.is_correct),
+      answeredAt: answer.answered_at
+    }))
+  };
+}
+
 module.exports = {
     startGame,
     getGameById,
     getCurrentQuestion,
     answerCurrentQuestion,
     stopGame,
-    getGameHistory
+    getGameHistory,
+    getGameDetail
 };

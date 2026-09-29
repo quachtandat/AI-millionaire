@@ -170,6 +170,32 @@ async function getGameHistory(req, res) {
   }
 }
 
+
+// Game detail
+async function getGameDetail(req, res) {
+  try {
+    const gameId = req.params.id;
+    const userId = req.user.userId;
+
+    const result = await gameService.getGameDetail(
+      gameId,
+      userId
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error("GET GAME DETAIL ERROR:", error);
+
+    return res.status(404).json({
+      success: false,
+      message: error.message || "Không thể lấy chi tiết game"
+    });
+  }
+}
+
 module.exports = {
-    startGame, getCurrentGame,answerQuestion,stopCurrentGame,getGameHistory
+    startGame, getCurrentGame,answerQuestion,stopCurrentGame,getGameHistory,getGameDetail
 };
