@@ -196,6 +196,29 @@ async function getGameDetail(req, res) {
   }
 }
 
+
+// rank
+async function getGameRanking(req, res) {
+  try {
+    // Có thể truyền ?limit=20
+    const limit = req.query.limit || 20;
+
+    const ranking = await gameService.getGameRanking(limit);
+
+    return res.status(200).json({
+      success: true,
+      data: ranking
+    });
+  } catch (error) {
+    console.error("GET GAME RANKING ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Không thể lấy bảng xếp hạng"
+    });
+  }
+}
+
 module.exports = {
-    startGame, getCurrentGame,answerQuestion,stopCurrentGame,getGameHistory,getGameDetail
+    startGame, getCurrentGame,answerQuestion,stopCurrentGame,getGameHistory,getGameDetail,getGameRanking
 };

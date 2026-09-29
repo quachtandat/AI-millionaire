@@ -595,6 +595,49 @@ async function getGameDetail(gameId, userId) {
   };
 }
 
+//rank
+async function getGameRanking(limit = 20) {
+  const [ranking] = await pool.query(
+    `
+    SELECT
+      u.id AS user_id,
+      u.username,
+
+      COALESCE(MAX(g.current_prize), 0) AS highest_prize,
+
+      COALESCE(MAX(g.current_level), 0) AS highest_level,
+
+      COUNT(g.id) AS games_played
+
+    FROM users u
+
+    LEFT JOIN games g
+      ON u.id = g.user_id
+
+    WHERE u.role = 'user'
+
+    GROUP BY u.id, u.username
+
+    ORDER BY
+      highest_prize DESC,
+      highest_level DESC,
+      games_played DESC
+
+    LIMIT ?
+    `,
+    [Number(limit)]
+  );
+
+  return ranking.map((player, index) => ({
+    rank: index + 1,
+    username: player.username,
+    highestPrize: Number(player.highest_prize),
+    highestLevel: Number(player.highest_level),
+    gamesPlayed: Number(player.games_played)
+  }));
+}
+
+
 module.exports = {
     startGame,
     getGameById,
@@ -602,5 +645,6 @@ module.exports = {
     answerCurrentQuestion,
     stopGame,
     getGameHistory,
-    getGameDetail
+    getGameDetail,
+    getGameRanking
 };

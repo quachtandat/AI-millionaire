@@ -2,7 +2,7 @@ const express = require("express");
 
 const router = express.Router();
 
-const { startGame, getCurrentGame, answerQuestion, stopCurrentGame, getGameHistory, getGameDetail } = require("../controllers/game.controller");
+const { startGame, getCurrentGame, answerQuestion, stopCurrentGame, getGameHistory, getGameDetail, getGameRanking } = require("../controllers/game.controller");
 
 const { authenticateToken } = require("../middleware/auth.middleware");
 
@@ -10,6 +10,8 @@ const { authenticateToken } = require("../middleware/auth.middleware");
 router.post("/start",authenticateToken, startGame);
 // lấy history game
 router.get("/history", authenticateToken, getGameHistory);
+// rank
+router.get("/ranking", authenticateToken, getGameRanking);
 // Lấy game detail
 router.get("/:id/detail", authenticateToken, getGameDetail);
 // Lấy game hiện tại
