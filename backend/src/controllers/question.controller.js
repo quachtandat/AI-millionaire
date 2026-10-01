@@ -1,5 +1,6 @@
-const questionService =
-    require("../services/question.service");
+const questionService = require("../services/question.service");
+
+const { validateQuestionData } = require("../utils/question.validation");
 
 async function createQuestion(req, res) {
     try {
@@ -29,6 +30,8 @@ async function createQuestion(req, res) {
                 });
             }
         }
+
+        validateQuestionData(data);
 
         const result =
             await questionService.createQuestion(
