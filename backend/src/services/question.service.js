@@ -208,6 +208,15 @@ async function updateQuestion(id, data) {
         throw new Error("Question not found");
     }
 
+    const [categories] = await pool.query(
+        `SELECT id FROM categories WHERE id = ?`,
+        [category_id]
+    );
+
+    if (categories.length === 0) {
+        throw new Error("Category not found");
+    }
+
     await pool.query(
         `UPDATE questions
          SET

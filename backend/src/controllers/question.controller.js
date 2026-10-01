@@ -113,6 +113,8 @@ async function getQuestion(req, res) {
 async function updateQuestion(req, res) {
     try {
         const { id } = req.params;
+        
+        validateQuestionData(req.body);
 
         const question =
             await questionService.updateQuestion(
