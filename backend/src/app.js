@@ -9,6 +9,8 @@ const questionRoutes = require("./routes/question.routes");
 const gameRoutes = require("./routes/game.routes");
 const userRoutes = require("./routes/user.routes");
 
+const aiQuestionRoutes = require("./routes/ai-question.routes");
+
 const app = express();
 
 // Middleware
@@ -26,6 +28,8 @@ app.use("/api/games", gameRoutes);
 
 app.use("/api/users", userRoutes);
 
+// AI Question routes
+app.use("/api/ai/questions", aiQuestionRoutes);
 // Home
 app.get("/", (req, res) => {
     res.json({

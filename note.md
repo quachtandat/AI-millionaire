@@ -10,5 +10,8 @@
 <h3>BE
 
 1. npm install bcrypt jsonwebtoken
+
+<h4> AI GENERATE
+
 2. npm install multer
 3. npm install @supabase/supabase-js
