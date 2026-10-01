@@ -76,10 +76,62 @@ async function getAllQuestions(filters = {}) {
         difficulty,
         prize_level,
         status,
-        source
+        source,
+        page = 1,
+        limit = 10
     } = filters;
 
-    let sql = `
+    // Đảm bảo page và limit là số hợp lệ
+    const currentPage = Math.max(Number(page) || 1, 1);
+    const perPage = Math.min(
+        Math.max(Number(limit) || 10, 1),
+        100
+    );
+
+    // Tính OFFSET
+    const offset = (currentPage - 1) * perPage;
+    // WHERE
+    let whereClause = "WHERE 1=1";
+    const params = [];
+
+    if (category_id) {
+        whereClause += " AND q.category_id = ?";
+        params.push(category_id);
+    }
+
+    if (difficulty) {
+        whereClause += " AND q.difficulty = ?";
+        params.push(difficulty);
+    }
+
+    if (prize_level) {
+        whereClause += " AND q.prize_level = ?";
+        params.push(prize_level);
+    }
+
+    if (status) {
+        whereClause += " AND q.status = ?";
+        params.push(status);
+    }
+
+    if (source) {
+        whereClause += " AND q.source = ?";
+        params.push(source);
+    }
+    // COUNT TOTAL
+    const [countRows] = await pool.query(
+        `
+        SELECT COUNT(*) AS total
+        FROM questions q
+        ${whereClause}
+        `,
+        params
+    );
+
+    const total = countRows[0].total;
+    // GET QUESTIONS
+    const [rows] = await pool.query(
+        `
         SELECT
             q.id,
             q.question,
@@ -100,51 +152,24 @@ async function getAllQuestions(filters = {}) {
         FROM questions q
         JOIN categories c
             ON q.category_id = c.id
-        WHERE 1 = 1
-    `;
-
-    const params = [];
-
-    // Lọc theo category
-    if (category_id !== undefined) {
-        sql += ` AND q.category_id = ?`;
-        params.push(category_id);
-    }
-
-    // Lọc theo difficulty
-    if (difficulty !== undefined) {
-        sql += ` AND q.difficulty = ?`;
-        params.push(difficulty);
-    }
-
-    // Lọc theo prize level
-    if (prize_level !== undefined) {
-        sql += ` AND q.prize_level = ?`;
-        params.push(prize_level);
-    }
-
-    // Lọc theo status
-    if (status !== undefined) {
-        sql += ` AND q.status = ?`;
-        params.push(status);
-    }
-
-    // Lọc theo source
-    if (source !== undefined) {
-        sql += ` AND q.source = ?`;
-        params.push(source);
-    }
-
-    sql += `
+        ${whereClause}
         ORDER BY q.id DESC
-    `;
-
-    const [rows] = await pool.query(
-        sql,
-        params
+        LIMIT ? OFFSET ?
+        `,
+        [...params, perPage, offset]
     );
+    // PAGINATION INFO
+    const totalPages = Math.ceil(total / perPage);
 
-    return rows;
+    return {
+        questions: rows,
+        pagination: {
+            page: currentPage,
+            limit: perPage,
+            total,
+            totalPages
+        }
+    };
 }
 
 

@@ -64,21 +64,22 @@ async function getQuestions(req, res) {
             difficulty: req.query.difficulty,
             prize_level: req.query.prize_level,
             status: req.query.status,
-            source: req.query.source
+            source: req.query.source,
+            // Pagination
+            page: req.query.page,
+            limit: req.query.limit
         };
 
-        const questions =
-            await questionService.getAllQuestions(
-                filters
-            );
+        const result =
+            await questionService.getAllQuestions(filters);
 
         res.json({
             success: true,
-            data: questions
+            data: result.questions,
+            pagination: result.pagination
         });
 
     } catch (error) {
-
         console.error(error);
 
         res.status(500).json({
@@ -113,7 +114,7 @@ async function getQuestion(req, res) {
 async function updateQuestion(req, res) {
     try {
         const { id } = req.params;
-        
+
         validateQuestionData(req.body);
 
         const question =
