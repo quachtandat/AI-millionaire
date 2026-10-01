@@ -55,8 +55,19 @@ async function createQuestion(req, res) {
 
 async function getQuestions(req, res) {
     try {
+
+        const filters = {
+            category_id: req.query.category_id,
+            difficulty: req.query.difficulty,
+            prize_level: req.query.prize_level,
+            status: req.query.status,
+            source: req.query.source
+        };
+
         const questions =
-            await questionService.getAllQuestions();
+            await questionService.getAllQuestions(
+                filters
+            );
 
         res.json({
             success: true,
@@ -64,6 +75,7 @@ async function getQuestions(req, res) {
         });
 
     } catch (error) {
+
         console.error(error);
 
         res.status(500).json({

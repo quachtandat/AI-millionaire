@@ -69,9 +69,18 @@ async function createQuestion(data, userId) {
 }
 
 
-async function getAllQuestions() {
-    const [rows] = await pool.query(
-        `SELECT
+async function getAllQuestions(filters = {}) {
+
+    const {
+        category_id,
+        difficulty,
+        prize_level,
+        status,
+        source
+    } = filters;
+
+    let sql = `
+        SELECT
             q.id,
             q.question,
             q.option_a,
@@ -88,10 +97,51 @@ async function getAllQuestions() {
             q.source,
             q.created_by,
             q.created_at
-         FROM questions q
-         JOIN categories c
+        FROM questions q
+        JOIN categories c
             ON q.category_id = c.id
-         ORDER BY q.id DESC`
+        WHERE 1 = 1
+    `;
+
+    const params = [];
+
+    // Lọc theo category
+    if (category_id !== undefined) {
+        sql += ` AND q.category_id = ?`;
+        params.push(category_id);
+    }
+
+    // Lọc theo difficulty
+    if (difficulty !== undefined) {
+        sql += ` AND q.difficulty = ?`;
+        params.push(difficulty);
+    }
+
+    // Lọc theo prize level
+    if (prize_level !== undefined) {
+        sql += ` AND q.prize_level = ?`;
+        params.push(prize_level);
+    }
+
+    // Lọc theo status
+    if (status !== undefined) {
+        sql += ` AND q.status = ?`;
+        params.push(status);
+    }
+
+    // Lọc theo source
+    if (source !== undefined) {
+        sql += ` AND q.source = ?`;
+        params.push(source);
+    }
+
+    sql += `
+        ORDER BY q.id DESC
+    `;
+
+    const [rows] = await pool.query(
+        sql,
+        params
     );
 
     return rows;
