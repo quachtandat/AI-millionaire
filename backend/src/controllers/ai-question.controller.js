@@ -89,6 +89,79 @@ async function generateQuestions(req, res) {
     }
 }
 
+
+async function getAIDraftQuestions(req, res) {
+    try {
+
+        const questions =
+            await aiQuestionService.getAIDraftQuestions();
+
+        res.json({
+            success: true,
+            data: questions
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(500).json({
+            success: false,
+            message: "Cannot get AI draft questions"
+        });
+    }
+}
+
+
+async function approveAIQuestion(req, res) {
+    try {
+
+        const { id } = req.params;
+
+        const question =
+            await aiQuestionService.approveAIQuestion(id);
+
+        res.json({
+            success: true,
+            message: "AI question approved successfully",
+            data: question
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+}
+
+
+async function rejectAIQuestion(req, res) {
+    try {
+        const { id } = req.params;
+
+        const question =
+            await aiQuestionService.rejectAIQuestion(id);
+
+        res.json({
+            success: true,
+            message: "AI question rejected successfully",
+            data: question
+        });
+
+    } catch (error) {
+        console.error(error);
+
+        res.status(400).json({
+            success: false,
+            message: error.message
+        });
+    }
+}
+
 module.exports = {
-    generateQuestions
+    generateQuestions,getAIDraftQuestions,approveAIQuestion,rejectAIQuestion
 };

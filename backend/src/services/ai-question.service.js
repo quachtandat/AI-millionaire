@@ -206,6 +206,167 @@ async function saveAIQuestions(
 }
 
 
+async function getAIDraftQuestions() {
+    const [rows] = await pool.query(
+        `SELECT
+            q.id,
+            q.question,
+            q.option_a,
+            q.option_b,
+            q.option_c,
+            q.option_d,
+            q.correct_answer,
+            q.category_id,
+            c.name AS category_name,
+            q.difficulty,
+            q.prize_level,
+            q.explanation,
+            q.status,
+            q.source,
+            q.created_by,
+            q.created_at
+         FROM questions q
+         LEFT JOIN categories c
+            ON q.category_id = c.id
+         WHERE q.status = 'draft'
+           AND q.source = 'ai'
+         ORDER BY q.id DESC`
+    );
+
+    return rows;
+}
+
+
+async function approveAIQuestion(questionId) {
+
+    const [rows] = await pool.query(
+        `SELECT
+            id,
+            status,
+            source
+         FROM questions
+         WHERE id = ?`,
+        [questionId]
+    );
+
+    if (rows.length === 0) {
+        throw new Error("Question not found");
+    }
+
+    const question = rows[0];
+
+    // Chỉ cho phép approve câu hỏi được tạo bởi AI
+    if (question.source !== "ai") {
+        throw new Error(
+            "Only AI questions can be approved here"
+        );
+    }
+
+    // Chỉ draft mới được approve
+    if (question.status !== "draft") {
+        throw new Error(
+            "Only draft questions can be approved"
+        );
+    }
+
+    await pool.query(
+        `UPDATE questions
+         SET status = 'approved'
+         WHERE id = ?`,
+        [questionId]
+    );
+
+    const [updatedRows] = await pool.query(
+        `SELECT
+            q.id,
+            q.question,
+            q.option_a,
+            q.option_b,
+            q.option_c,
+            q.option_d,
+            q.correct_answer,
+            q.category_id,
+            c.name AS category_name,
+            q.difficulty,
+            q.prize_level,
+            q.explanation,
+            q.status,
+            q.source,
+            q.created_by,
+            q.created_at
+         FROM questions q
+         LEFT JOIN categories c
+            ON q.category_id = c.id
+         WHERE q.id = ?`,
+        [questionId]
+    );
+
+    return updatedRows[0];
+}
+
+
+async function rejectAIQuestion(questionId) {
+    // 1. Kiểm tra câu hỏi có tồn tại không
+    const [rows] = await pool.query(
+        `SELECT id, status, source
+         FROM questions
+         WHERE id = ?`,
+        [questionId]
+    );
+
+    if (rows.length === 0) {
+        throw new Error("Question not found");
+    }
+
+    const question = rows[0];
+
+    // 2. Chỉ cho phép reject câu hỏi được tạo bởi AI
+    if (question.source !== "ai") {
+        throw new Error("Only AI questions can be rejected here");
+    }
+
+    // 3. Chỉ reject câu hỏi đang ở trạng thái draft
+    if (question.status !== "draft") {
+        throw new Error("Only draft questions can be rejected");
+    }
+
+    // 4. Chuyển status từ draft -> rejected
+    await pool.query(
+        `UPDATE questions
+         SET status = 'rejected'
+         WHERE id = ?`,
+        [questionId]
+    );
+
+    // 5. Lấy lại dữ liệu sau khi update
+    const [updatedRows] = await pool.query(
+        `SELECT
+            q.id,
+            q.question,
+            q.option_a,
+            q.option_b,
+            q.option_c,
+            q.option_d,
+            q.correct_answer,
+            q.category_id,
+            c.name AS category_name,
+            q.difficulty,
+            q.prize_level,
+            q.explanation,
+            q.status,
+            q.source,
+            q.created_by,
+            q.created_at
+         FROM questions q
+         LEFT JOIN categories c
+             ON q.category_id = c.id
+         WHERE q.id = ?`,
+        [questionId]
+    );
+
+    return updatedRows[0];
+}
+
 module.exports = {
-    generateQuestions,saveAIQuestions
+    generateQuestions,saveAIQuestions,getAIDraftQuestions,approveAIQuestion,rejectAIQuestion
 };
