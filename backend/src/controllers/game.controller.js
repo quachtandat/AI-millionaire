@@ -122,6 +122,29 @@ async function answerQuestion(req, res) {
     }
 }
 
+// POST /api/games/:id/timeout
+async function timeoutCurrentGame(req, res) {
+  try {
+    const gameId = req.params.id;
+    const userId = req.user.userId;
+    const expectedLevel = Number(req.body.expectedLevel);
+
+    if (!Number.isInteger(expectedLevel) || expectedLevel < 1 || expectedLevel > 15) {
+      return res.status(400).json({ success: false, message: "expectedLevel must be between 1 and 15" });
+    }
+
+    const result = await gameService.timeoutGame(gameId, userId, expectedLevel);
+    return res.status(200).json({
+      success: true,
+      message: result.timedOut ? "Hết thời gian trả lời" : "Game đã chuyển sang trạng thái mới",
+      data: result
+    });
+  } catch (error) {
+    console.error("TIMEOUT GAME ERROR:", error);
+    return res.status(400).json({ success: false, message: error.message || "Không thể kết thúc game khi hết giờ" });
+  }
+}
+
 
 // stop game
 async function stopCurrentGame(req, res) {
@@ -333,5 +356,5 @@ async function usePhone(req, res) {
 }
 
 module.exports = {
-    startGame, getCurrentGame,answerQuestion,stopCurrentGame,getGameHistory,getGameDetail,getGameRanking,getGameStatistics,useFiftyFifty,useAudience,usePhone
+    startGame, getCurrentGame,answerQuestion,timeoutCurrentGame,stopCurrentGame,getGameHistory,getGameDetail,getGameRanking,getGameStatistics,useFiftyFifty,useAudience,usePhone
 };

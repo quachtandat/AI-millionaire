@@ -58,7 +58,7 @@ Return this format:
     for (let attempt = 1; attempt <= 5; attempt++) {
         try {
             response = await ai.models.generateContent({
-                model: "gemini-3.7-flash",
+                model: "gemini-3.6-flash",
                 contents: prompt
             });
 

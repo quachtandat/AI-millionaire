@@ -56,13 +56,6 @@ async function generateQuestions(req, res) {
                 language: language || "vi"
             });
 
-        res.json({
-            success: true,
-            data: result
-        });
-
-
-
         const savedQuestions =
             await aiQuestionService.saveAIQuestions(
                 result.questions,
@@ -72,7 +65,7 @@ async function generateQuestions(req, res) {
                 prize_level
         );
 
-        res.json({
+        return res.status(201).json({
             success: true,
             message: "AI questions generated successfully",
             data: savedQuestions

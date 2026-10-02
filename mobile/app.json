@@ -4,6 +4,15 @@
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "AI Millionaire cần quyền truy cập ảnh để cập nhật avatar.",
+          "microphonePermission": false
+        }
+      ]
+    ],
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {

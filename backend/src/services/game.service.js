@@ -214,6 +214,7 @@ async function answerCurrentQuestion(gameId, userId, selectedAnswer) {
             WHERE id = ?
               AND user_id = ?
             LIMIT 1
+            FOR UPDATE
             `,
             [gameId, userId]
         );
@@ -431,6 +432,53 @@ async function answerCurrentQuestion(gameId, userId, selectedAnswer) {
     } finally {
         connection.release();
     }
+}
+
+// End a game as lost when the current question timer expires.
+async function timeoutGame(gameId, userId, expectedLevel) {
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [games] = await connection.query(
+      `SELECT id, current_level, current_prize, status
+       FROM games
+       WHERE id = ? AND user_id = ?
+       FOR UPDATE`,
+      [gameId, userId]
+    );
+
+    if (games.length === 0) throw new Error("Game không tồn tại");
+    const game = games[0];
+
+    // An answer may have completed while the timeout request was in flight.
+    // Never let a stale timer end the next question.
+    if (game.status !== "playing" || Number(game.current_level) !== expectedLevel) {
+      await connection.commit();
+      return { timedOut: false, gameOver: false, status: game.status, currentLevel: game.current_level, currentPrize: game.current_prize };
+    }
+
+    await connection.query(
+      `UPDATE games SET status = 'lost', finished_at = NOW() WHERE id = ?`,
+      [gameId]
+    );
+    await connection.commit();
+
+    return {
+      gameId: game.id,
+      timedOut: true,
+      gameOver: true,
+      gameStatus: "lost",
+      currentLevel: game.current_level,
+      currentPrize: game.current_prize
+    };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 // stop game
@@ -1170,6 +1218,7 @@ module.exports = {
     getGameById,
     getCurrentQuestion,
     answerCurrentQuestion,
+    timeoutGame,
     stopGame,
     getGameHistory,
     getGameDetail,

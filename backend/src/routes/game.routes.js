@@ -2,7 +2,7 @@ const express = require("express");
 
 const router = express.Router();
 
-const { startGame, getCurrentGame, answerQuestion, stopCurrentGame, getGameHistory, getGameDetail, getGameRanking, getGameStatistics, useFiftyFifty, useAudience, usePhone } = require("../controllers/game.controller");
+const { startGame, getCurrentGame, answerQuestion, timeoutCurrentGame, stopCurrentGame, getGameHistory, getGameDetail, getGameRanking, getGameStatistics, useFiftyFifty, useAudience, usePhone } = require("../controllers/game.controller");
 
 const { authenticateToken } = require("../middleware/auth.middleware");
 
@@ -20,6 +20,8 @@ router.get("/:id/detail", authenticateToken, getGameDetail);
 router.get("/:id", authenticateToken, getCurrentGame);
 // Trả lời câu hỏi hiện tại
 router.post("/:id/answer",authenticateToken,answerQuestion);
+// Mark the current question as unanswered after the player's timer expires.
+router.post("/:id/timeout", authenticateToken, timeoutCurrentGame);
 // stop game
 router.post("/:id/stop", authenticateToken, stopCurrentGame);
 // 50:50
