@@ -1,19 +1,47 @@
 import { useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 import { clearAuthError, loginUser } from '../../redux/slices/authSlice';
 import AppInput from '../../components/AppInput';
+import { storage } from '../../utils/storage';
 
 export default function LoginScreen({ navigation }) {
   const dispatch = useDispatch();
   const { loading, error } = useSelector((state) => state.auth);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [askingRemember, setAskingRemember] = useState(false);
 
-  const submit = () => {
+  const attemptLogin = (rememberSession) => {
     dispatch(clearAuthError());
-    dispatch(loginUser({ email: email.trim(), password }));
+    dispatch(loginUser({ email: email.trim(), password, rememberSession }));
+  };
+
+  const submit = async () => {
+    if (askingRemember || loading) return;
+    dispatch(clearAuthError());
+    setAskingRemember(true);
+    try {
+      const savedChoice = await storage.getRememberSession(email);
+      if (savedChoice !== null) {
+        setAskingRemember(false);
+        attemptLogin(savedChoice === 'true');
+        return;
+      }
+      Alert.alert(
+        'Lưu đăng nhập?',
+        'Bạn có muốn lưu phiên đăng nhập trên thiết bị này để lần sau không cần nhập lại email và mật khẩu? Ứng dụng chỉ lưu phiên đăng nhập, không lưu mật khẩu.',
+        [
+          { text: 'Không', style: 'cancel', onPress: () => { setAskingRemember(false); attemptLogin(false); } },
+          { text: 'Có', onPress: () => { setAskingRemember(false); attemptLogin(true); } },
+        ],
+        { cancelable: false },
+      );
+    } catch {
+      setAskingRemember(false);
+      Alert.alert('Không thể đọc tùy chọn', 'Vui lòng thử đăng nhập lại.');
+    }
   };
 
   return (
@@ -24,8 +52,8 @@ export default function LoginScreen({ navigation }) {
           <AppInput label="Email" accessibilityLabel="Email" autoCapitalize="none" autoComplete="email" keyboardType="email-address" value={email} onChangeText={setEmail} placeholder="ban@email.com" style={styles.input} editable={!loading} />
           <AppInput label="Mật khẩu" accessibilityLabel="Mật khẩu" autoComplete="password" secureTextEntry value={password} onChangeText={setPassword} placeholder="Nhập mật khẩu" style={styles.input} editable={!loading} onSubmitEditing={submit} />
           {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-          <Pressable accessibilityRole="button" disabled={loading || !email.trim() || !password} onPress={submit} style={({ pressed }) => [styles.button, (pressed || loading) && styles.buttonPressed, (!email.trim() || !password) && styles.buttonDisabled]}>
-            {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>ĐĂNG NHẬP</Text>}
+          <Pressable accessibilityRole="button" disabled={loading || askingRemember || !email.trim() || !password} onPress={submit} style={({ pressed }) => [styles.button, (pressed || loading || askingRemember) && styles.buttonPressed, (!email.trim() || !password) && styles.buttonDisabled]}>
+            {loading || askingRemember ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>ĐĂNG NHẬP</Text>}
           </Pressable>
           <View style={styles.footer}><Text style={styles.footerText}>Chưa có tài khoản? </Text><Pressable onPress={() => { dispatch(clearAuthError()); navigation.navigate('Register'); }} hitSlop={8}><Text style={styles.link}>Đăng ký</Text></Pressable></View>
         </View>

@@ -1,4 +1,18 @@
 const gameService = require("../services/game.service");
+const practiceService = require("../services/practice.service");
+
+async function startSmartQuiz(req, res) {
+  try {
+    const categoryId = req.body.categoryId ? Number(req.body.categoryId) : null;
+    if (categoryId !== null && (!Number.isInteger(categoryId) || categoryId < 1)) {
+      return res.status(400).json({ success: false, message: "categoryId must be a positive integer" });
+    }
+    const data = await practiceService.startSmartQuiz(req.user.userId, categoryId);
+    return res.status(201).json({ success: true, message: "Đã bắt đầu Smart Practice", data });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message || "Không thể bắt đầu Smart Practice" });
+  }
+}
 
 // POST /api/games/start
 // Bắt đầu game
@@ -79,7 +93,7 @@ async function answerQuestion(req, res) {
 
         const userId = req.user.userId;
 
-        const { selectedAnswer } = req.body;
+        const { selectedAnswer, expectedLevel } = req.body;
 
 
         if (!selectedAnswer) {
@@ -94,7 +108,8 @@ async function answerQuestion(req, res) {
             await gameService.answerCurrentQuestion(
                 gameId,
                 userId,
-                selectedAnswer
+                selectedAnswer,
+                expectedLevel
             );
 
 
@@ -266,6 +281,33 @@ async function getGameStatistics(req, res) {
   }
 }
 
+async function getCategoryStatistics(req, res) {
+  try {
+    const data = await gameService.getCategoryStatistics(req.user.userId);
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || "Không thể lấy thống kê danh mục" });
+  }
+}
+
+async function getDifficultyStatistics(req, res) {
+  try {
+    const data = await gameService.getDifficultyStatistics(req.user.userId);
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || "Không thể lấy thống kê độ khó" });
+  }
+}
+
+async function getResponseTimeStatistics(req, res) {
+  try {
+    const data = await gameService.getResponseTimeStatistics(req.user.userId);
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || "Không thể lấy thời gian trả lời" });
+  }
+}
+
 
 // 50:50
 async function useFiftyFifty(req, res) {
@@ -356,5 +398,5 @@ async function usePhone(req, res) {
 }
 
 module.exports = {
-    startGame, getCurrentGame,answerQuestion,timeoutCurrentGame,stopCurrentGame,getGameHistory,getGameDetail,getGameRanking,getGameStatistics,useFiftyFifty,useAudience,usePhone
+    startGame, startSmartQuiz, getCurrentGame,answerQuestion,timeoutCurrentGame,stopCurrentGame,getGameHistory,getGameDetail,getGameRanking,getGameStatistics,getCategoryStatistics,getDifficultyStatistics,getResponseTimeStatistics,useFiftyFifty,useAudience,usePhone
 };

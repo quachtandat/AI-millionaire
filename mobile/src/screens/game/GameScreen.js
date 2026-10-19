@@ -15,6 +15,7 @@ export default function GameScreen({ navigation }) {
   const { game, currentQuestion, currentLevel, currentPrize, lifelines, removedOptions, answerResult, answering, timingOut, lifelineLoading, error } = useSelector((state) => state.game);
   const [timeRemaining, setTimeRemaining] = useState(60);
   const busy = answering || timingOut || lifelineLoading || timeRemaining === 0;
+  const isPractice = game?.game_mode === 'practice';
   const confirmStop = useCallback(() => {
     if (busy) {
       Alert.alert('Đang xử lý', 'Hãy chờ câu trả lời hiện tại hoàn tất rồi thử lại.');
@@ -83,21 +84,22 @@ export default function GameScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.topline}><View><Text style={styles.eyebrow}>CÂU HỎI {currentLevel} / 15</Text><Text style={styles.prize}>{Number(currentPrize).toLocaleString('vi-VN')} ₫</Text></View><View style={[styles.timerBadge, timeRemaining <= 10 && styles.timerUrgent]}><Text style={[styles.timerText, timeRemaining <= 10 && styles.timerTextUrgent]}>◷  {timeRemaining}s</Text></View></View>
+        <View style={styles.topline}><View><Text style={styles.eyebrow}>{isPractice ? `LUYỆN TẬP ${currentLevel} / ${game.total_questions || game.totalQuestions || 10}` : `CÂU HỎI ${currentLevel} / 15`}</Text>{!isPractice ? <Text style={styles.prize}>{Number(currentPrize).toLocaleString('vi-VN')} ₫</Text> : <Text style={styles.prize}>Độ khó: {currentQuestion.difficulty}</Text>}</View><View style={[styles.timerBadge, timeRemaining <= 10 && styles.timerUrgent]}><Text style={[styles.timerText, timeRemaining <= 10 && styles.timerTextUrgent]}>◷  {timeRemaining}s</Text></View></View>
         <View style={styles.timerTrack}><View style={[styles.timerProgress, timeRemaining <= 10 && styles.timerProgressUrgent, { width: `${(timeRemaining / 60) * 100}%` }]} /></View>
-        <PrizeLadder currentLevel={currentLevel} />
+        {!isPractice ? <PrizeLadder currentLevel={currentLevel} /> : null}
         <View style={styles.questionCard}><Text style={styles.question}>{currentQuestion.text}</Text></View>
-        {answerResult?.isCorrect && !answerResult?.gameOver ? <View accessibilityRole="alert" style={styles.success}><Text style={styles.successText}>✓  Chính xác! Bạn đã lên câu {currentLevel}.</Text></View> : null}
+        {answerResult?.isCorrect && !answerResult?.gameOver ? <View accessibilityRole="alert" style={styles.success}><Text style={styles.successText}>✓  Chính xác! Bạn đã lên câu {currentLevel}.</Text>{answerResult.explanation ? <Text style={styles.successText}>{answerResult.explanation}</Text> : null}</View> : null}
+        {isPractice && answerResult && !answerResult.isCorrect && !answerResult.gameOver ? <View accessibilityRole="alert" style={styles.success}><Text style={styles.successText}>Đáp án đúng: {answerResult.correctAnswer}</Text>{answerResult.explanation ? <Text style={styles.successText}>{answerResult.explanation}</Text> : null}</View> : null}
         <View style={styles.options}>
           {OPTION_LABELS.map((letter) => <QuestionOption key={letter} letter={letter} text={currentQuestion.options[letter]} removed={removedOptions.includes(letter)} disabled={busy} onPress={() => answer(letter)} />)}
         </View>
         {answering ? <View style={styles.inlineLoading}><ActivityIndicator color="#176B5B" /><Text style={styles.body}>Đang kiểm tra đáp án…</Text></View> : timingOut ? <View style={styles.inlineLoading}><ActivityIndicator color="#B63838" /><Text style={styles.body}>Hết giờ. Đang lưu kết quả…</Text></View> : null}
         {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-        <Text style={styles.lifelineHeading}>QUYỀN TRỢ GIÚP</Text>
+        {!isPractice ? <Text style={styles.lifelineHeading}>QUYỀN TRỢ GIÚP</Text> : null}
         <View style={styles.lifelines}>
           {[
             ['fifty-fifty', '50:50'], ['audience', 'Khán giả'], ['phone', 'Gọi điện'],
-          ].map(([kind, label]) => <LifelineButton key={kind} title={label} used={lifelines[kind]} disabled={busy} onPress={() => activate(kind)} />)}
+          ].map(([kind, label]) => !isPractice ? <LifelineButton key={kind} title={label} used={lifelines[kind]} disabled={busy} onPress={() => activate(kind)} /> : null)}
         </View>
         <Pressable accessibilityRole="button" disabled={busy} onPress={confirmStop} style={styles.stop}><Text style={styles.stopText}>DỪNG CHƠI</Text></Pressable>
       </ScrollView>

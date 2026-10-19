@@ -1,5 +1,7 @@
 const { ai } = require("../ai/ai.service");
 const pool = require("../config/db");
+const qualityService = require("./ai-question-quality.service");
+const { validateQuestionData } = require("../utils/question.validation");
 
 async function generateQuestions({
     topic,
@@ -141,6 +143,11 @@ Return this format:
                 "Invalid correct_answer"
             );
         }
+        const options = [question.option_a, question.option_b, question.option_c, question.option_d]
+            .map((value) => String(value).trim().toLocaleLowerCase());
+        if (new Set(options).size !== 4) {
+            throw new Error("AI question options must be unique");
+        }
     }
 
     return parsed;
@@ -156,7 +163,20 @@ async function saveAIQuestions(
 ) {
     const savedQuestions = [];
 
+    const [categories] = await pool.query("SELECT id FROM categories WHERE id = ?", [categoryId]);
+    if (!categories.length) throw new Error("Category not found");
+
+    const seenInBatch = new Set();
+
     for (const question of questions) {
+        validateQuestionData({ category_id: categoryId, difficulty, prize_level: prizeLevel, correct_answer: question.correct_answer });
+        const normalized = qualityService.normalizeQuestionText(question.question);
+        if (seenInBatch.has(normalized)) throw new Error("AI generated duplicate questions in the same batch");
+        const quality = await qualityService.assess({ ...question, category_id: categoryId, difficulty, prize_level: prizeLevel });
+        if (quality.issues.includes("Duplicate question in the same category")) {
+            throw new Error("AI generated a question that already exists in this category");
+        }
+        seenInBatch.add(normalized);
 
         const [result] = await pool.query(
             `INSERT INTO questions (
@@ -197,6 +217,8 @@ async function saveAIQuestions(
             difficulty,
             prize_level: prizeLevel,
             status: "draft",
+            qualityScore: quality.score,
+            qualityIssues: quality.issues,
             source: "ai",
             created_by: userId
         });
@@ -233,7 +255,7 @@ async function getAIDraftQuestions() {
          ORDER BY q.id DESC`
     );
 
-    return rows;
+    return Promise.all(rows.map(async (row) => ({ ...row, quality: await qualityService.assess(row) })));
 }
 
 
@@ -268,6 +290,10 @@ async function approveAIQuestion(questionId) {
             "Only draft questions can be approved"
         );
     }
+
+    const [contentRows] = await pool.query("SELECT * FROM questions WHERE id = ?", [questionId]);
+    const quality = await qualityService.assess(contentRows[0]);
+    if (!quality.eligible) throw new Error(`Question quality score ${quality.score} is below the configured approval threshold`);
 
     await pool.query(
         `UPDATE questions

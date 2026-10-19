@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutUser } from '../../redux/slices/authSlice';
-import { clearGameError, startGame } from '../../redux/slices/gameSlice';
+import { clearGameError, startGame, startSmartQuiz } from '../../redux/slices/gameSlice';
 import AppButton from '../../components/AppButton';
 import Avatar from '../../components/Avatar';
 import ErrorMessage from '../../components/ErrorMessage';
@@ -23,6 +23,11 @@ export default function HomeScreen({ navigation }) {
     const result = await dispatch(startGame());
     if (startGame.fulfilled.match(result)) navigation.navigate('Game');
   };
+  const playSmart = async () => {
+    dispatch(clearGameError());
+    const result = await dispatch(startSmartQuiz(null));
+    if (startSmartQuiz.fulfilled.match(result)) navigation.navigate('Game');
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -32,6 +37,8 @@ export default function HomeScreen({ navigation }) {
       {statsError ? <ErrorMessage message={statsError} onRetry={() => dispatch(loadStatistics())} /> : null}
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
       <AppButton title="CHƠI NGAY" loading={loading} onPress={() => play(navigation)} style={styles.play} />
+      <AppButton title="LUYỆN TẬP THÔNG MINH" loading={loading} onPress={playSmart} style={styles.play} />
+      <View style={styles.links}><Pressable onPress={() => navigation.navigate('Performance')}><Text style={styles.link}>Hiệu suất</Text></Pressable><Pressable onPress={() => navigation.navigate('KnowledgeProfile')}><Text style={styles.link}>Hồ sơ kiến thức</Text></Pressable><Pressable onPress={() => navigation.navigate('Recommendations')}><Text style={styles.link}>Gợi ý ôn tập</Text></Pressable></View>
     </SafeAreaView>
   );
 }
@@ -44,4 +51,5 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#176B5B', borderRadius: 24, padding: 24, marginTop: 36 }, cardEyebrow: { color: '#D6F1E8', fontSize: 12, fontWeight: '700', letterSpacing: 1.2 }, cardTitle: { color: '#FFFFFF', fontSize: 30, lineHeight: 32, fontWeight: '700', marginTop: 16 }, cardCopy: { color: '#E1F0EA', fontSize: 16, lineHeight: 23, marginTop: 12 },
   profile: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, marginTop: 24 }, profileLabel: { color: '#77847D', fontSize: 12, fontWeight: '700', letterSpacing: 1 }, profileValue: { color: '#14251F', fontSize: 16, marginTop: 8, fontWeight: '700' }, stats: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }, statLabel: { color: '#66736D', fontSize: 12, marginTop: 4 },
   error: { color: '#B63838', fontSize: 12, marginTop: 16 }, play: { minHeight: 56, borderRadius: 16, backgroundColor: '#176B5B', alignItems: 'center', justifyContent: 'center', marginTop: 24 }, playText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700', letterSpacing: 0.6 }, disabled: { opacity: 0.6 },
+  links: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, marginTop: 18 }, link: { color: '#176B5B', fontSize: 13, fontWeight: '700', paddingVertical: 8 },
 });

@@ -11,6 +11,9 @@ import RegisterScreen from '../screens/auth/RegisterScreen';
 import MainNavigator from './MainNavigator';
 import GameDetailScreen from '../screens/history/GameDetailScreen';
 import AdminManagementScreen from '../screens/admin/AdminManagementScreen';
+import PerformanceScreen from '../screens/analytics/PerformanceScreen';
+import KnowledgeProfileScreen from '../screens/learning/KnowledgeProfileScreen';
+import RecommendationsScreen from '../screens/learning/RecommendationsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -35,6 +38,9 @@ function RootNavigator() {
             <Stack.Screen name="Game" component={GameScreen} />
             <Stack.Screen name="Result" component={ResultScreen} />
             <Stack.Screen name="GameDetail" component={GameDetailScreen} />
+            <Stack.Screen name="Performance" component={PerformanceScreen} />
+            <Stack.Screen name="KnowledgeProfile" component={KnowledgeProfileScreen} />
+            <Stack.Screen name="Recommendations" component={RecommendationsScreen} />
           </>
         )
       ) : (

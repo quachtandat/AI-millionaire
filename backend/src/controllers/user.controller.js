@@ -1,4 +1,5 @@
 const userService = require("../services/user.service");
+const learningService = require("../services/learning.service");
 
 async function getUserProfile(req, res) {
   try {
@@ -156,6 +157,33 @@ async function uploadAvatar(req, res) {
   }
 }
 
+async function getKnowledgeProfile(req, res) {
+  try {
+    const data = await learningService.getKnowledgeProfile(req.user.userId);
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || "Không thể lấy hồ sơ kiến thức" });
+  }
+}
+
+async function getRecommendations(req, res) {
+  try {
+    const data = await learningService.getRecommendations(req.user.userId);
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || "Không thể lấy gợi ý ôn tập" });
+  }
+}
+
+async function getAdminOverview(req, res) {
+  try {
+    const data = await learningService.getAdminOverview();
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message || "Không thể lấy tổng quan quản trị" });
+  }
+}
+
 module.exports = {
-  getUserProfile,updateUserProfile,changePassword,uploadAvatar
+  getUserProfile,updateUserProfile,changePassword,uploadAvatar,getKnowledgeProfile,getRecommendations,getAdminOverview
 };

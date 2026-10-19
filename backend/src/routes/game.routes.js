@@ -2,18 +2,22 @@ const express = require("express");
 
 const router = express.Router();
 
-const { startGame, getCurrentGame, answerQuestion, timeoutCurrentGame, stopCurrentGame, getGameHistory, getGameDetail, getGameRanking, getGameStatistics, useFiftyFifty, useAudience, usePhone } = require("../controllers/game.controller");
+const { startGame, startSmartQuiz, getCurrentGame, answerQuestion, timeoutCurrentGame, stopCurrentGame, getGameHistory, getGameDetail, getGameRanking, getGameStatistics, useFiftyFifty, useAudience, usePhone } = require("../controllers/game.controller");
 
 const { authenticateToken } = require("../middleware/auth.middleware");
 
 // Bắt đầu game
 router.post("/start",authenticateToken, startGame);
+router.post("/smart-quiz/start", authenticateToken, startSmartQuiz);
 // lấy history game
 router.get("/history", authenticateToken, getGameHistory);
 // rank
 router.get("/ranking", authenticateToken, getGameRanking);
 // Personal Statistics
 router.get("/statistics", authenticateToken, getGameStatistics);
+router.get("/statistics/categories", authenticateToken, require("../controllers/game.controller").getCategoryStatistics);
+router.get("/statistics/difficulties", authenticateToken, require("../controllers/game.controller").getDifficultyStatistics);
+router.get("/statistics/response-times", authenticateToken, require("../controllers/game.controller").getResponseTimeStatistics);
 // Lấy game detail
 router.get("/:id/detail", authenticateToken, getGameDetail);
 // Lấy game hiện tại

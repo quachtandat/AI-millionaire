@@ -18,13 +18,16 @@ export const startGame = createAsyncThunk('game/start', async (_, { rejectWithVa
   try { return await gameService.startGame(); } catch (error) { return rejectWithValue(getApiError(error)); }
 });
 
+export const startSmartQuiz = createAsyncThunk('game/startSmartQuiz', async (categoryId, { rejectWithValue }) => {
+  try { return await gameService.startSmartQuiz(categoryId); } catch (error) { return rejectWithValue(getApiError(error)); }
+});
+
 export const answerQuestion = createAsyncThunk('game/answer', async (selectedAnswer, { getState, rejectWithValue }) => {
   try {
-    const gameId = getState().game.game?.gameId ?? getState().game.game?.id;
-    const result = await gameService.answerQuestion(gameId, selectedAnswer);
-    const safeResult = { ...result };
-    delete safeResult.correctAnswer;
-    return { ...safeResult, question: toSafeQuestion(result.question) };
+    const { game, currentLevel } = getState().game;
+    const gameId = game?.gameId ?? game?.id;
+    const result = await gameService.answerQuestion(gameId, selectedAnswer, currentLevel);
+    return { ...result, question: toSafeQuestion(result.question) };
   } catch (error) { return rejectWithValue(getApiError(error)); }
 });
 
@@ -75,6 +78,16 @@ const gameSlice = createSlice({
         state.lifelines = { 'fifty-fifty': false, audience: false, phone: false };
       })
       .addCase(startGame.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+      .addCase(startSmartQuiz.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(startSmartQuiz.fulfilled, (state, action) => {
+        state.loading = false;
+        state.game = action.payload.game;
+        state.currentLevel = action.payload.game.current_level || 1;
+        state.currentPrize = action.payload.game.current_prize || 0;
+        state.currentQuestion = toSafeQuestion(action.payload.question);
+        state.lifelines = { 'fifty-fifty': false, audience: false, phone: false };
+      })
+      .addCase(startSmartQuiz.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
       .addCase(answerQuestion.pending, (state) => { state.answering = true; state.error = null; state.answerResult = null; })
       .addCase(answerQuestion.fulfilled, (state, action) => {
         state.answering = false;

@@ -8,12 +8,18 @@ export const gameService = {
     const current = currentResponse.data.data;
     return { ...current, game: { ...current.game, gameId: created.gameId } };
   },
+  async startSmartQuiz(categoryId) {
+    const response = await api.post('/games/smart-quiz/start', categoryId ? { categoryId } : {});
+    const created = response.data.data;
+    const current = await api.get(`/games/${created.gameId}`);
+    return { ...current.data.data, game: { ...current.data.data.game, ...created, gameId: created.gameId, game_mode: 'practice' } };
+  },
   async getGame(gameId) {
     const response = await api.get(`/games/${gameId}`);
     return response.data.data;
   },
-  async answerQuestion(gameId, selectedAnswer) {
-    const response = await api.post(`/games/${gameId}/answer`, { selectedAnswer });
+  async answerQuestion(gameId, selectedAnswer, expectedLevel) {
+    const response = await api.post(`/games/${gameId}/answer`, { selectedAnswer, expectedLevel });
     return response.data.data;
   },
   async timeoutGame(gameId, expectedLevel) {

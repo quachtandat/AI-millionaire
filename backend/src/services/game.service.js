@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const practiceService = require("./practice.service");
 
 const {
     PRIZE_LEVELS,
@@ -6,8 +7,11 @@ const {
 } = require("../config/game.config");
 
 
-async function getRandomQuestionForLevel(connection, level) {
+async function getRandomQuestionForLevel(connection, level, excludedQuestionIds = []) {
     const difficulty = DIFFICULTY_BY_LEVEL[level];
+    const exclusions = excludedQuestionIds.length
+        ? `AND id NOT IN (${excludedQuestionIds.map(() => "?").join(",")})`
+        : "";
 
     const [rows] = await connection.query(
         `
@@ -16,10 +20,11 @@ async function getRandomQuestionForLevel(connection, level) {
         WHERE prize_level = ?
           AND difficulty = ?
           AND status = 'approved'
+          ${exclusions}
         ORDER BY RAND()
         LIMIT 1
         `,
-        [level, difficulty]
+        [level, difficulty, ...excludedQuestionIds]
     );
 
     if (rows.length === 0) {
@@ -56,11 +61,14 @@ async function startGame(userId) {
         const gameId = gameResult.insertId;
 
         // 2. Chọn 15 câu hỏi
+        const selectedQuestionIds = [];
         for (let level = 1; level <= 15; level++) {
             const questionId = await getRandomQuestionForLevel(
                 connection,
-                level
+                level,
+                selectedQuestionIds
             );
+            selectedQuestionIds.push(questionId);
 
             const prize = PRIZE_LEVELS[level];
 
@@ -118,6 +126,8 @@ async function getGameById(gameId, userId) {
             current_level,
             current_prize,
             status,
+            game_mode,
+            total_questions,
             started_at,
             finished_at
         FROM games
@@ -185,8 +195,34 @@ async function getCurrentQuestion(gameId, userId) {
     return rows[0];
 }
 
+async function advancePracticeGame(connection, game, question, gameId, userId, isCorrect) {
+    const currentLevel = Number(game.current_level);
+    if (currentLevel >= Number(game.total_questions)) {
+        await connection.query("UPDATE games SET status = 'won', finished_at = NOW() WHERE id = ?", [gameId]);
+        await connection.commit();
+        return { gameOver: true, isCorrect, gameStatus: "won", currentLevel,
+            totalQuestions: Number(game.total_questions), correctAnswer: question.correct_answer,
+            explanation: question.explanation, message: "Bạn đã hoàn thành lượt luyện tập!" };
+    }
+    const nextLevel = currentLevel + 1;
+    const accuracy = await practiceService.recentAccuracy(connection, userId);
+    const difficulty = practiceService.chooseDifficulty(accuracy);
+    const selection = await practiceService.chooseQuestion(connection, difficulty, question.category_id, gameId);
+    const nextQuestionId = selection.id;
+    await connection.query("UPDATE games SET current_level = ? WHERE id = ?", [nextLevel, gameId]);
+    await connection.query(`INSERT INTO game_questions (game_id, question_id, level, order_number, question_started_at)
+      VALUES (?, ?, ?, ?, NOW(3))`, [gameId, nextQuestionId, nextLevel, nextLevel]);
+    const [nextRows] = await connection.query(`SELECT q.id AS question_id, q.question, q.option_a, q.option_b,
+      q.option_c, q.option_d, q.category_id, c.name AS category_name, q.difficulty, q.prize_level
+      FROM questions q LEFT JOIN categories c ON c.id = q.category_id WHERE q.id = ?`, [nextQuestionId]);
+    await connection.commit();
+    return { gameOver: false, isCorrect, gameStatus: "playing", currentLevel: nextLevel,
+        totalQuestions: Number(game.total_questions), adaptiveDifficulty: selection.difficulty,
+        correctAnswer: question.correct_answer, explanation: question.explanation, question: nextRows[0] };
+}
+
 // Trả lời câu hỏi hiện tại
-async function answerCurrentQuestion(gameId, userId, selectedAnswer) {
+async function answerCurrentQuestion(gameId, userId, selectedAnswer, expectedLevel) {
     const connection = await pool.getConnection();
 
     try {
@@ -209,7 +245,9 @@ async function answerCurrentQuestion(gameId, userId, selectedAnswer) {
                 user_id,
                 current_level,
                 current_prize,
-                status
+                status,
+                game_mode,
+                total_questions
             FROM games
             WHERE id = ?
               AND user_id = ?
@@ -226,6 +264,10 @@ async function answerCurrentQuestion(gameId, userId, selectedAnswer) {
 
 
         const game = games[0];
+
+        if (expectedLevel !== undefined && Number(game.current_level) !== Number(expectedLevel)) {
+            throw new Error("Câu hỏi đã thay đổi. Vui lòng trả lời câu hiện tại.");
+        }
 
         // 3. Kiểm tra game còn đang chơi không
         if (game.status !== "playing") {
@@ -244,7 +286,9 @@ async function answerCurrentQuestion(gameId, userId, selectedAnswer) {
                 q.option_d,
                 q.correct_answer,
                 q.explanation,
-                q.prize_level
+                q.prize_level,
+                q.category_id,
+                GREATEST(0, TIMESTAMPDIFF(MICROSECOND, gq.question_started_at, NOW(3)) / 1000000) AS response_time_seconds
             FROM game_questions gq
 
             INNER JOIN questions q
@@ -281,17 +325,23 @@ async function answerCurrentQuestion(gameId, userId, selectedAnswer) {
                 game_id,
                 question_id,
                 selected_answer,
-                is_correct
+                is_correct,
+                response_time_seconds
             )
-            VALUES (?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
             `,
             [
                 gameId,
                 question.id,
                 selectedAnswer,
-                isCorrect
+                isCorrect,
+                Number(question.response_time_seconds)
             ]
         );
+
+        if (game.game_mode === "practice") {
+            return await advancePracticeGame(connection, game, question, gameId, userId, isCorrect);
+        }
 
         // 7. Nếu trả lời SAI
         if (!isCorrect) {
@@ -349,6 +399,8 @@ async function answerCurrentQuestion(gameId, userId, selectedAnswer) {
                 gameStatus: "won",
                 currentLevel: 15,
                 currentPrize: finalPrize,
+                correctAnswer: question.correct_answer,
+                explanation: question.explanation,
                 message: "Chúc mừng! Bạn đã thắng 1 tỷ đồng!"
             };
         }
@@ -370,6 +422,11 @@ async function answerCurrentQuestion(gameId, userId, selectedAnswer) {
                 nextPrize,
                 gameId
             ]
+        );
+
+        await connection.query(
+            `UPDATE game_questions SET question_started_at = NOW(3) WHERE game_id = ? AND level = ?`,
+            [gameId, nextLevel]
         );
 
         // 11. Lấy câu hỏi tiếp theo
@@ -423,7 +480,9 @@ async function answerCurrentQuestion(gameId, userId, selectedAnswer) {
             gameStatus: "playing",
             currentLevel: nextLevel,
             currentPrize: nextPrize,
-            question: nextQuestion
+            question: nextQuestion,
+            correctAnswer: question.correct_answer,
+            explanation: question.explanation
         };
 
     } catch (error) {
@@ -763,6 +822,10 @@ async function getGameStatistics(userId) {
     gamesWon: Number(game.games_won),
     gamesLost: Number(game.games_lost),
     gamesStopped: Number(game.games_stopped),
+    totalGames: Number(game.games_played),
+    wonGames: Number(game.games_won),
+    lostGames: Number(game.games_lost),
+    stoppedGames: Number(game.games_stopped),
 
     highestPrize: Number(game.highest_prize),
     highestLevel: Number(game.highest_level),
@@ -770,9 +833,66 @@ async function getGameStatistics(userId) {
     totalQuestionsAnswered: Number(
       answer.total_questions_answered
     ),
+    totalQuestions: Number(answer.total_questions_answered),
 
     correctAnswers: Number(answer.correct_answers),
-    wrongAnswers: Number(answer.wrong_answers)
+    wrongAnswers: Number(answer.wrong_answers),
+    accuracy: Number(answer.total_questions_answered)
+      ? Number((Number(answer.correct_answers) / Number(answer.total_questions_answered) * 100).toFixed(2))
+      : 0
+  };
+}
+
+async function getCategoryStatistics(userId) {
+  const [rows] = await pool.query(`
+    SELECT c.id AS category_id, c.name AS category_name,
+      COUNT(*) AS total_answers,
+      SUM(CASE WHEN ga.is_correct = 1 THEN 1 ELSE 0 END) AS correct_answers
+    FROM game_answers ga
+    JOIN games g ON g.id = ga.game_id
+    JOIN questions q ON q.id = ga.question_id
+    JOIN categories c ON c.id = q.category_id
+    WHERE g.user_id = ?
+    GROUP BY c.id, c.name ORDER BY total_answers DESC`, [userId]);
+  return rows.map((row) => ({
+    categoryId: Number(row.category_id), categoryName: row.category_name,
+    totalAnswers: Number(row.total_answers), correctAnswers: Number(row.correct_answers),
+    accuracy: Number((Number(row.correct_answers) / Number(row.total_answers) * 100).toFixed(2))
+  }));
+}
+
+async function getDifficultyStatistics(userId) {
+  const [rows] = await pool.query(`
+    SELECT q.difficulty, COUNT(*) AS total_answers,
+      SUM(CASE WHEN ga.is_correct = 1 THEN 1 ELSE 0 END) AS correct_answers,
+      AVG(ga.response_time_seconds) AS average_response_time
+    FROM game_answers ga
+    JOIN games g ON g.id = ga.game_id
+    JOIN questions q ON q.id = ga.question_id
+    WHERE g.user_id = ?
+    GROUP BY q.difficulty`, [userId]);
+  return rows.map((row) => ({
+    difficulty: row.difficulty, totalAnswers: Number(row.total_answers),
+    correctAnswers: Number(row.correct_answers),
+    accuracy: Number((Number(row.correct_answers) / Number(row.total_answers) * 100).toFixed(2)),
+    averageResponseTime: row.average_response_time === null ? null : Number(Number(row.average_response_time).toFixed(2))
+  }));
+}
+
+async function getResponseTimeStatistics(userId) {
+  const [summaryRows] = await pool.query(`
+    SELECT AVG(ga.response_time_seconds) AS average_time,
+      MIN(ga.response_time_seconds) AS fastest_time,
+      MAX(ga.response_time_seconds) AS slowest_time
+    FROM game_answers ga JOIN games g ON g.id = ga.game_id
+    WHERE g.user_id = ? AND ga.response_time_seconds IS NOT NULL`, [userId]);
+  const byDifficulty = await getDifficultyStatistics(userId);
+  const row = summaryRows[0];
+  const numeric = (value) => value === null ? null : Number(Number(value).toFixed(2));
+  return {
+    averageResponseTime: numeric(row.average_time), fastestAnswer: numeric(row.fastest_time),
+    slowestAnswer: numeric(row.slowest_time),
+    byDifficulty: byDifficulty.map(({ difficulty, averageResponseTime }) => ({ difficulty, averageResponseTime }))
   };
 }
 
@@ -1224,6 +1344,9 @@ module.exports = {
     getGameDetail,
     getGameRanking,
     getGameStatistics,
+    getCategoryStatistics,
+    getDifficultyStatistics,
+    getResponseTimeStatistics,
     useFiftyFifty,
     useAudience,
     usePhone

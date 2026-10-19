@@ -5,8 +5,12 @@ import { storage } from '../../utils/storage';
 
 export const loginUser = createAsyncThunk('auth/login', async (credentials, { rejectWithValue }) => {
   try {
-    const result = await authService.login(credentials);
-    await storage.setToken(result.token);
+    const { rememberSession, ...loginCredentials } = credentials;
+    const result = await authService.login(loginCredentials);
+    const savedChoice = await storage.getRememberSession(loginCredentials.email);
+    const shouldRemember = savedChoice === null ? Boolean(rememberSession) : savedChoice === 'true';
+    if (savedChoice === null) await storage.setRememberSession(loginCredentials.email, shouldRemember);
+    await storage.setToken(result.token, shouldRemember);
     return result;
   } catch (error) {
     return rejectWithValue(getApiError(error));
