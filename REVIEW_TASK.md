@@ -109,3 +109,15 @@
 - [Game screen](https://github.com/quachtandat/AI-millionaire/blob/main/mobile/src/screens/game/GameScreen.js)
 - [App setup / CORS](https://github.com/quachtandat/AI-millionaire/blob/main/backend/src/app.js)
 - [Database schema](https://github.com/quachtandat/AI-millionaire/blob/main/backend/migrations/db.sql)
+
+## 6. Bộ tài liệu review
+
+- [REVIEW_REPORT.md](REVIEW_REPORT.md) — báo cáo tổng thể.
+- [FRONTEND_REVIEW.md](FRONTEND_REVIEW.md) — review mobile/frontend.
+- [BACKEND_REVIEW.md](BACKEND_REVIEW.md) — review API và nghiệp vụ backend.
+- [DATABASE_REVIEW.md](DATABASE_REVIEW.md) — review schema, quan hệ và ERD.
+- [SECURITY_REVIEW.md](SECURITY_REVIEW.md) — review bảo mật.
+- [TESTING_REVIEW.md](TESTING_REVIEW.md) — test cases và chiến lược kiểm thử.
+- [DEFENSE_PREPARATION.md](DEFENSE_PREPARATION.md) — câu hỏi và gợi ý trả lời bảo vệ.
+
+> Lưu ý: Các test case trong TESTING_REVIEW.md là kế hoạch kiểm thử, không phải kết quả đã chạy. Các mục đánh dấu Needs verification cần được kiểm tra runtime hoặc đọc thêm file liên quan trước khi coi là lỗi xác nhận.
